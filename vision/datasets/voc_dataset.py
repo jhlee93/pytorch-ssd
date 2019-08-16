@@ -17,6 +17,7 @@ class VOCDataset:
         self.root = pathlib.Path(root)
         self.transform = transform
         self.target_transform = target_transform
+        is_test = False
         if is_test:
             image_sets_file = self.root / "ImageSets/Main/test.txt"
         else:

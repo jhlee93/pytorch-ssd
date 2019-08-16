@@ -17,6 +17,7 @@ from vision.ssd.mobilenet_v2_ssd_lite import create_mobilenetv2_ssd_lite
 from vision.ssd.squeezenet_ssd_lite import create_squeezenet_ssd_lite
 from vision.datasets.voc_dataset import VOCDataset
 from vision.datasets.open_images import OpenImagesDataset
+from vision.datasets.piap_dataset import PIAPDataset
 from vision.nn.multibox_loss import MultiboxLoss
 from vision.ssd.config import vgg_ssd_config
 from vision.ssd.config import mobilenetv1_ssd_config
@@ -80,7 +81,7 @@ parser.add_argument('--t_max', default=120, type=float,
                     help='T_max value for Cosine Annealing Scheduler.')
 
 # Train params
-parser.add_argument('--batch_size', default=32, type=int,
+parser.add_argument('--batch_size', default=64, type=int,
                     help='Batch size for training')
 parser.add_argument('--num_epochs', default=120, type=int,
                     help='the number epochs')
@@ -101,6 +102,7 @@ logging.basicConfig(stream=sys.stdout, level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 args = parser.parse_args()
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() and args.use_cuda else "cpu")
+print("\n=====> Run : ", DEVICE)
 
 if args.use_cuda and torch.cuda.is_available():
     torch.backends.cudnn.benchmark = True
@@ -205,6 +207,14 @@ if __name__ == '__main__':
             label_file = os.path.join(args.checkpoint_folder, "voc-model-labels.txt")
             store_labels(label_file, dataset.class_names)
             num_classes = len(dataset.class_names)
+
+        elif args.dataset_type == 'piap':
+            dataset = PIAPDataset(dataset_path, transform=train_transform,
+                                 target_transform=target_transform)
+            label_file = os.path.join(args.checkpoint_folder, "piap_label.names")
+            store_labels(label_file, dataset.class_names)
+            num_classes = len(dataset.class_names)
+
         elif args.dataset_type == 'open_images':
             dataset = OpenImagesDataset(dataset_path,
                  transform=train_transform, target_transform=target_transform,
@@ -231,12 +241,19 @@ if __name__ == '__main__':
         val_dataset = OpenImagesDataset(dataset_path,
                                         transform=test_transform, target_transform=target_transform,
                                         dataset_type="test")
+    elif args.dataset_type == "piap":
+        val_dataset = PIAPDataset(args.validation_dataset, transform=test_transform,
+                                 target_transform=target_transform, is_test=True)
+   
         logging.info(val_dataset)
+
+    # voc 
     logging.info("validation dataset size: {}".format(len(val_dataset)))
 
     val_loader = DataLoader(val_dataset, args.batch_size,
                             num_workers=args.num_workers,
                             shuffle=False)
+
     logging.info("Build network.")
     net = create_net(num_classes)
     min_loss = -10000.0
@@ -317,7 +334,6 @@ if __name__ == '__main__':
         scheduler.step()
         train(train_loader, net, criterion, optimizer,
               device=DEVICE, debug_steps=args.debug_steps, epoch=epoch)
-        
         if epoch % args.validation_epochs == 0 or epoch == args.num_epochs - 1:
             val_loss, val_regression_loss, val_classification_loss = test(val_loader, net, criterion, DEVICE)
             logging.info(
