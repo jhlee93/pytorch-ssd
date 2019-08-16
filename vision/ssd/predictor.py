@@ -28,16 +28,12 @@ class Predictor:
     def predict(self, image, top_k=-1, prob_threshold=None):
         cpu_device = torch.device("cpu")
         height, width, _ = image.shape
-        # image = self.transform(image)
-        # images = image.unsqueeze(0)
-        # images = images.to(self.device)
+        image = self.transform(image)
+        images = image.unsqueeze(0)
+        images = images.to(self.device)
         with torch.no_grad():
-            image = self.transform(image)
-            images = image.unsqueeze(0)
-            images = images.to(self.device)
-
             self.timer.start()
-            scores, boxes = self.net.forward(images.cpu())
+            scores, boxes = self.net.forward(images)
             print("Inference time: ", self.timer.end())
         boxes = boxes[0]
         scores = scores[0]
